@@ -1,4 +1,4 @@
-Test - Tidy Time Series and Forecasting in R
+Tidy Time Series and Forecasting in R
 ================
 
 ### rstudio::conf 2020

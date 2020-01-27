@@ -1,0 +1,29 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#library(fpp3)
+library(readxl)
+```
+
+# 1. Tsibble
+
+- index columns: only have 1 index
+- key columns: can have multiple indexes.
+- create tsibble from tibble: pipe to as_tsibble(index = col1)
+
+# 2. Lab #1
+
+```{r}
+#tourism <- readxl::read_excel('http://robjhyndman.com/data/tourism.xlsx')
+tourism <- read_excel("data/tourism.xlsx")
+```
+
+```{r}
+tourism_ts <- 
+```
+
+# Lab #2
+
