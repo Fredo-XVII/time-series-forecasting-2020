@@ -46,7 +46,9 @@ snowy %>% frame_calendar()
 
 head(pedestrian)
 
-# Lab #4 - Trend, Seasonal, and Cyclical: lag plots autocorrelation update_tsibble
+# Lab #4 - Trend, Seasonal, and Cyclical: 
+## Functions:
+lag plots autocorrelation update_tsibble
 
 ## Examples
 new_production %>%  gg_lag(df$Beer, geom = "point")
@@ -110,6 +112,7 @@ top_n(avg_gdp_pg, n = 5)
 # Lab #7 - Transformations: Power and ? Monotonic Transformation
 ## Box-Cox Transformations: 
 
+## Functions:
 features(series, features = guerror)
 log1p() # log + 1
 box_cox()
@@ -132,12 +135,100 @@ vic_elec %>% #autoplot()
 # Canadian gas production
 
 # Lab #8: Seasonality and Trends - Decompostion
+## mable, dables, fables
+## Functions:
+
+model()
+STL()
+components()
+autolayer()
+
+### STL: Seasonal, Trend decomp using Loess - only additive (need transformation othewise)
+
+### Example
+dcmp <- elecequip %>% 
+  model(STL(value ~ season(window = 7))) %>% 
+  components()
+
+autoplot(dcmp) %>% autolayer(dcmp, trend, col = "blue")
+gg_season(dcmp, season_year)
+electequip %>% autoplot(dcmp) %>% autolayer(dcmp, trend, col = "blue")
+
+### Excercises - canadian gas data
+can_gas <- canadian_gas %>% 
+  model(STL(log(Volume) ~ season(window = 100) + trend(window = 10))) %>% 
+  components() %>% 
+  as_tsibble()
+
+can_gas %>% autoplot()
+gg_season(can_gas, y = season_year )
+
+can_gas %>% autoplot(.vars = season_adjust)
 
 
+#Multiple Seasonality, seasonal adjustment
+## No Exercises, no lab
+
+# Lab #9: Time Series features - anything computed from a time series.
+## Strength of Seasonality
+## functions:
+features(series, feat_stl)
+features(series, feature_set(pkgs = "feasts"))
+
+## Exercises
+
+tourism_ts %>% head()
+holiday_feats <- tourism_ts %>% filter(Purpose == "Holiday") %>% 
+  features(features = feat_stl) %>% 
+  mutate_at(.vars = c("seasonal_peak_year","seasonal_trough_year"), .funs = as.factor)
+  
+GGally::ggpairs(holiday_feats %>% select_if(is.numeric))
 
 
+holiday_feats_acf <- tourism_ts %>% filter(Purpose == "Holiday") %>% 
+  features(features = feat_acf) 
+
+GGally::ggpairs(holiday_feats_acf %>% select_if(is.numeric))
+
+# Lab #10: Feature Extraction
+## functions:
+broom::augment()
+prcomp()
+feature_set()
+
+tourism_features <- tourism_ts %>% 
+  features(Trips, feature_set(pkgs = "feasts"))
+
+pcs <- tourism_features %>% 
+  select(-State,-Region, -Purpose) %>% 
+  prcomp(scale = TRUE) %>% 
+  broom::augment(tourism_features)
+
+pcs %>% 
+  ggplot(aes(x = .fittedPC1, y = .fittedPC2)) +
+  geom_point() + 
+  theme(aspect.ratio = 0.5)
+
+pcs %>% 
+  ggplot(aes(x = .fittedPC1, y = .fittedPC2, col = Purpose)) +
+  geom_point() + 
+  theme(aspect.ratio = 0.5)
 
 
+## Exercises
+PBS %>% head()
+pbs_no_zeros <- PBS %>% 
+  group_by_key() %>% # tsibble
+  filter(!all(Cost == 0)) %>% 
+  ungroup()
+
+pbs_features <- pbs_no_zeros %>% 
+  features(Cost, feature_set(pkgs = "feasts"))
+
+pbs_pcs <- pbs_features %>% 
+  select(-Month, Concession, Type, ATC1, ATC1_desc, ATC2, ATC2_desc) %>% 
+  prcomp(scale = TRUE) %>% 
+  broom::augment(pbs_features)
 
 
 
