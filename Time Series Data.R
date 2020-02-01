@@ -5,6 +5,10 @@ library(readxl)
 library(sugrrants)
 library(feasts)
 
+
+##### DAY#1 -------------------------------------------------------------------
+
+
 # Lab #1
 
 #tourism <- readxl::read_excel('http://robjhyndman.com/data/tourism.xlsx')
@@ -229,6 +233,282 @@ pbs_pcs <- pbs_features %>%
   select(-Month, Concession, Type, ATC1, ATC1_desc, ATC2, ATC2_desc) %>% 
   prcomp(scale = TRUE) %>% 
   broom::augment(pbs_features)
+
+##### DAY#2 -------------------------------------------------------------------
+
+# Benchmark
+
+## Simple: naive, mean, seasonal naive, RW with drift
+## functions:
+fabletools::model()
+fabletools::forecast()
+
+# Lab #11: Benchmark methods
+
+hh_budget %>% head()
+hh_budget %>% autoplot(.vars = Wealth)
+weath_fc <- hh_budget %>% 
+  dplyr::filter(!is.na(Wealth)) %>% 
+  fabletools::model(
+    #snaive = SNAIVE(Wealth),
+    naive = NAIVE(Wealth),
+    Drift = RW(Wealth ~ drift()),
+    Mean = MEAN(Wealth)
+  )
+
+### Build the forecast
+weath_fc %>% fabletools::forecast(h = "5 years") %>% 
+  filter(.model == "naive") %>% 
+  autoplot()
+
+aus_retail
+
+# Lab #12: Residuals
+## functions: 
+augment() - pass the fitted model
+gg_tsresiduals()
+features()
+model()
+## Notes: Jacqe-Bera test are too sensitive.
+
+## Exercises
+autoplot(aus_production, .vars = Beer)
+beer_fit <- aus_production %>% select(Quarter, Beer) %>% 
+  model(snaive = SNAIVE(Beer))
+
+forecast(beer_fit)
+augment(beer_fit)
+gg_tsresiduals(beer_fit)
+augment(beer_fit) %>% features(.resid, ljung_box, dof = 4, lag = 20 )
+
+
+## Lab#13: Forecast Accuracy Mearures
+## functions
+## NEW MAPE: MASE !!! 
+
+beer_fc <- forecast(beer_fit, h = "3 years")
+accuracy(beer_fc, aus_production)
+
+## Exercises
+autoplot(hh_budget, .vars = Wealth)
+hh_budget %>% nrow()
+wealth_test <- hh_budget %>% tail(n = 4)
+wealth_train <- hh_budget %>% filter(Year <= max(Year) - 4)
+wealth_fit <- wealth_train %>%
+  model(naive = NAIVE(Wealth),
+        Mean = MEAN(Wealth),
+        RW = RW(Wealth ~ drift())
+        )
+
+wealth_fit %>% 
+  forecast(h = "4 years") %>% 
+  autoplot(hh_budget, level = NULL) 
+  
+hh_budget_forecast %>% 
+  accuaryc(hh_budget) %>% 
+  group_by(.model) %>% 
+  summarise_if(is.numerc, mean)
+
+# Lab#14: ExponenTial Smoothing: ETS
+## functions:
+report()
+ETS()
+trend()
+
+## Examples
+aus_economy <- gloabl_economy %>% 
+  filter(Code == "AUS") %>% 
+  mutate(Pop = population/1e6) 
+fit <- aus_economy %>% 
+  model(AAN = ETS(Pop))
+report(fit)
+
+fit %>% 
+  forecast(h = 20) %>% 
+  autoplot(aus_economy) 
+
+## Exercises
+china_gdp <- global_economy %>% filter(Country == "China")
+
+china_fit <- china_gdp %>% 
+  model(ets_base = ETS(GDP),
+        ets_bx = ETS(box_cox(GDP, lambda = .5)),
+        ets_log = ETS(log(GDP))
+        )
+
+china_fit %>% augment() %>% autoplot()
+china_fit %>% forecast(h = 20) %>% 
+  autoplot(china_gdp, level = NULL)
+
+components(fit)
+glance(fit)
+tidy(fit)
+coef(fit)
+
+
+# Lab #15:  Seasonal Methods - Holt Winters
+## functions
+
+## Examples
+
+# Notes: AIC is just like cross-validation for TimeSeries
+
+## Exercises
+gas_train <- aus_production %>% 
+  filter(Quarter <= max(Quarter) - 8)
+
+gas_fit <- gas_train %>% 
+  model(
+    ets_base = ETS(Gas),
+    ets_log = ETS(log(Gas)),
+    ets_damp = ETS(Gas ~ trend("Ad")),
+    ets_damp = ETS(log(Gas) ~ trend("Ad"))
+    
+  )
+
+gas_fit
+forecast(gas_fit, h = 16) %>% autoplot(aus_production, level = NULL)
+accuracy(gas_fit) # gives MASE
+report(gas_fit)
+components(gas_fit)
+glance(gas_fit)
+tidy(gas_fit)
+coef(gas_fit)
+
+# Lab #NA: Non-Guassian forecast distributions (not Normal errors)
+## functions
+generate(h = "3 years" times = 1000, boostrap = TRUE) # build simulations, use sims for forecasting.
+forecast(, boostrap = TRUE) # same as generate to sim a future path.
+
+## NOTE: ETS does not work with Cycles!!!
+
+
+# Lab# 16: ARIMA Models: Must be stationary, requires transformation.
+##Note: AICc is only within model class, and same differencing.
+## functions:
+fable:: # ts cross validation
+forecast::tsCV()
+difference(12) # creates 12 step lag
+
+us_gdp <- global_economy %>% filter(Code == "USA")
+
+us_fit <- us_gdp %>% 
+  model(
+    arma = ARIMA(GDP),
+    arma_log = ARIMA(log(GDP)),
+    arma_log1 = ARIMA(log(GDP) ~ pdq(p=2:3,d=1,q=2))
+  )
+report(us_fit)
+glance(us_fit)
+accuracy(us_fit)
+us_fit %>% forecast(h = 5) %>% 
+  autoplot(us_gdp, level = NULL)
+
+# Lab #17: ARIMA Seasonality
+## 
+parameters for ARIMA
+stepwise = F
+approximation = F
+order_constraint = p + d + q + >9
+
+tourism %>% head()
+tour_hol <- tourism %>% filter(Purpose == "Holiday") %>% #Region == "Snowy Mountains"
+  as_tsibble(index = Quarter, key = c(Region, State))
+autoplot(tour_hol, .vars = Trips)
+
+tour_hol_fit <- tour_hol %>% 
+  model(
+    auto_arima = ARIMA(Trips)
+  )
+
+tour_hol_fit %>% report()
+tour_hol_fit %>% accuracy()
+tour_hol_fit %>% glance()
+
+tour_hol_fit %>% filter(Region == "Barkly") %>% 
+  forecast(h = 5, level = NULL) %>% 
+  autoplot(tour_hol)
+
+# Lab #NA: Ensembles, FFORMA - custom weights for ensembles
+
+# Dynamic Forecast: adding covariates, NOT CAUSAL MODELS!!
+# Regression with ARIMA errors: RegARIMA
+# Notes: need a df of covariate data for forecast
+# functions:
+ARIMA(y ~ x1 + x2 +...+xn)
+forecast(fit, new_data = us_change_future)
+
+## Example
+augment(fit) %>% 
+  features(.resid, ljung_box, dof = 6, )
+
+#forecasting with covariates
+
+
+# Lab #18: Daily Data
+## Notes: Piece-wise linear functions.
+
+
+# Lab #19: Dynamic Harmonic regressions: Daily/Weekly Data
+## NOTES: Weekly data, upto K <= 26, 2 coef * 26 weeks = 52 weeks, or seasonal pattern.
+##    Much better than Seasonal Arima for weekly/daily data.
+## functions
+ARIMA(series ~ fourier(K = 1) + PDQ(0,0,0))
+fourier(period = 24*365) # aka, hourly seasonality + daily seasonality.
+K = 1 sin,
+K = 2, sin + cos
+K = 13, start with 13 for weekly data, will create 26 coefs.
+
+# Exercises
+
+# Lab #19: Lagged Predictors
+## functions:
+put lag around predictor 
+
+
+# Lab #20: Forecast Reconcilation: Hiearachical / Grouped time series
+## functions:
+aggregate_key(purpose * (State / Region), Trips = sum(Trips))
+aggregate_key((Region / Group) * (Class / Dept), Sales = sum(Sales))
+reconcile()
+min_trace() # minimize the trace of the covariance
+filter_index()
+
+## Example
+## Exercise 
+PBS %>% head()
+
+pbs_agg_base <- PBS %>% 
+  aggregate_key(Concession / Type / ATC1,
+                Costs = sum(Cost)/1e6)
+
+pbs_agg_fc <- pbs_agg_base %>% 
+  filter(Month <= max(Month) - 36) %>% 
+  model(
+    ml_ets = ETS(Costs),
+    ml_arima = ARIMA(Costs),
+    ml_snaive = SNAIVE(Costs)
+  ) %>% 
+  reconcile(adj_ets = min_trace(ml_ets),
+            adj_arima = min_trace(ml_arima),
+            adj_snaive = min_trace(ml_snaive)
+            ) %>% 
+  forecast(h = "3 years")
+
+accuracy(fc, pbs_agg_base) %>% 
+  group_by(.model) %>% 
+  summarise(MASE = mean(MASE)) %>% 
+  arrange(MASE)
+
+
+
+
+
+
+
+
+
+
 
 
 
